@@ -93,4 +93,7 @@ protected:
 public:
 	afx_msg void OnImageExportImage();
 	afx_msg void OnHexExportRawData();
+	afx_msg void SaveImage(Image* image, CString s);
+	afx_msg void SaveRaw(unsigned char* data, int size, CString filepath, const MFTEntry& file);
+
 };

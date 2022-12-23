@@ -464,6 +464,14 @@ void CPreviewDlg::OnImageExportImage()
 	ExportImage(GetSafeHwnd(), bitmap, s);
 }
 
+void CPreviewDlg::SaveImage(Image* image, CString s) {
+	SaveImageNow(image, s);
+}
+
+void CPreviewDlg::SaveRaw(unsigned char* data, int size, CString filepath, const MFTEntry& file) {
+	SaveRawNow(data, size, filepath, file);
+}
+
 void CPreviewDlg::OnHexExportRawData()
 {
 	CString s;

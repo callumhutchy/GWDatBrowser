@@ -5,6 +5,11 @@
 #include "GWDatBrowser.h"
 #include "GWDatBrowserDlg.h"
 
+#include <direct.h>
+#include <fstream>
+#include <iostream>
+#include <string>
+
 #ifdef _DEBUG
 #define new DEBUG_NEW
 #endif
@@ -17,13 +22,13 @@ class CAboutDlg : public CDialog
 public:
 	CAboutDlg();
 
-// Dialog Data
+	// Dialog Data
 	enum { IDD = IDD_ABOUTBOX };
 
-	protected:
+protected:
 	virtual void DoDataExchange(CDataExchange* pDX);    // DDX/DDV support
 
-// Implementation
+	// Implementation
 protected:
 	DECLARE_MESSAGE_MAP()
 };
@@ -73,7 +78,7 @@ BEGIN_MESSAGE_MAP(CGWDatBrowserDlg, CResizableDialog)
 END_MESSAGE_MAP()
 
 
-UINT MyThreadProc( LPVOID pParam )
+UINT MyThreadProc(LPVOID pParam)
 {
 	GWDat* dat = ((ThreadData*)pParam)->dat;
 	CGWDatBrowserDlg* dlg = ((ThreadData*)pParam)->dlg;
@@ -85,7 +90,7 @@ UINT MyThreadProc( LPVOID pParam )
 	{
 		data = dat->readFile(i, false);
 		delete[] data;
-		if(exitThread)
+		if (exitThread)
 			return 0;
 
 		dlg->SendMessage(WM_FILEREAD, dlg->indexToSortedIndex[i], i);
@@ -132,7 +137,7 @@ BOOL CGWDatBrowserDlg::OnInitDialog()
 	fileListCtrl.InsertColumn(6, L"Flags", 0, 60, 6);
 	fileListCtrl.InsertColumn(7, L"Type", 0, 80, 7);
 	fileListCtrl.InsertColumn(8, L"Hash", 0, 80, 7);
-	
+
 	fileListCtrl.SetExtendedStyle(fileListCtrl.GetExtendedStyle() | LVS_EX_FULLROWSELECT | LVS_EX_DOUBLEBUFFER);
 
 	previewDlg = new CPreviewDlg(this);
@@ -140,7 +145,7 @@ BOOL CGWDatBrowserDlg::OnInitDialog()
 
 	// Find the path to the GW.dat in the registry
 	CRegKey key;
-	if (ERROR_SUCCESS == key.Open( HKEY_CURRENT_USER, L"SOFTWARE\\ArenaNet\\Guild Wars", KEY_READ))
+	if (ERROR_SUCCESS == key.Open(HKEY_CURRENT_USER, L"SOFTWARE\\ArenaNet\\Guild Wars", KEY_READ))
 	{
 		TCHAR buffer[1024];
 		DWORD dwCount = sizeof(buffer);
@@ -162,7 +167,7 @@ BOOL CGWDatBrowserDlg::OnInitDialog()
 
 	CString title = L"GWDatbrowser (" + gwpath + L")";
 	SetWindowText(title);
-	
+
 	unsigned int files = dat.readDat(gwpath.GetString());
 
 	if (files == 0)
@@ -180,6 +185,151 @@ BOOL CGWDatBrowserDlg::OnInitDialog()
 	ThreadData* t = new ThreadData(&dat, this);
 	workerThread = AfxBeginThread(MyThreadProc, t);
 
+	for (int i = 0; i < dat.getNumFiles(); i++) {
+		unsigned char* data = dat.readFile(i);
+		if (data)
+		{
+			int type = dat[i].type;
+			if (type >= ATEXDXT1 && type <= ATTXDXTL && type != ATEXDXTA && type != ATTXDXTA)
+			{
+				Picture p = ProcessImageFile(data, dat[i].uncompressedSize);
+
+				if (p.bitmap)
+				{
+					CString path = _T(".\\Data\\");
+					switch (type) {
+					case ATEXDXT1:
+						path += _T("ATEXDXT1\\");
+						break;
+					case ATEXDXT2:
+						path += _T("ATEXDXT2\\");
+						break;
+					case ATEXDXT3:
+						path += _T("ATEXDXT3\\");
+						break;
+					case ATEXDXT4:
+						path += _T("ATEXDXT4\\");
+						break;
+					case ATEXDXT5:
+						path += _T("ATEXDXT5\\");
+						break;
+					case ATEXDXTN:
+						path += _T("ATEXDXTN\\");
+						break;
+					case ATEXDXTL:
+						path += _T("ATEXDXTL\\");
+						break;
+					case ATTXDXT1:
+						path += _T("ATTXDXT1\\");
+						break;
+					case ATTXDXT3:
+						path += _T("ATTXDXT3\\");
+						break;
+					case ATTXDXT5:
+						path += _T("ATTXDXT5\\");
+						break;
+					case ATTXDXTN:
+						path += _T("ATTXDXTN\\");
+						break;
+					case ATTXDXTL:
+						path += _T("ATTXDXTL\\");
+						break;
+					}
+					CT2A ascii(path);
+					_mkdir(ascii);
+
+					CString indexStr;
+					indexStr.Format(_T("%d"), i);
+					path += indexStr + _T(".png");
+					previewDlg->SaveImage(p.bitmap, path);
+				}
+
+				delete p.imageData;
+			}
+			else if (type == SOUND || type == AMP)
+			{
+				CString path = _T(".\\Data\\Sound\\");
+
+				CT2A ascii(path);
+				_mkdir(ascii);
+				CString indexStr;
+				indexStr.Format(_T("%d"), i);
+				path += indexStr;
+				previewDlg->SaveRaw(data, dat[i].uncompressedSize, path, dat[i]);
+			}
+			else
+			{
+				CString path = _T(".\\Data\\");
+				CString indexStr;
+				indexStr.Format(_T("%d"), i);
+
+				switch (type) {
+				case FFNA:
+					path += _T("FFNA\\");
+					break;
+				case DDS:
+					path += _T("DDS\\");
+					break;
+				case MFTBASE:
+					path += _T("MFTBASE\\");
+					break;
+				case TEXT:
+					path += _T("TEXT\\");
+					break;
+				case UNKNOWN:
+					path += _T("UNKNOWN\\");
+					break;
+				case AMAT:
+					path += _T("AMAT\\");
+					break;
+				case ATEXDXTA:
+					path += _T("ATEXDXTA\\");
+					break;
+				case ATTXDXTA:
+					path += _T("ATTXDXTA\\");
+					break;
+				default:
+					path += _T("UNSORTED\\");
+				}
+				CT2A ascii(path);
+				_mkdir(ascii);
+				path += indexStr;
+
+				switch (type) {
+				case FFNA:
+					path += _T(".ffna");
+					break;
+				case DDS:
+					path += _T(".dds");
+					break;
+				case MFTBASE:
+					path += _T(".mftbase");
+					break;
+				case TEXT:
+					path += _T(".txt");
+					break;
+				case UNKNOWN:
+					path += _T(".unknown");
+					break;
+				case AMAT:
+					path += _T(".amat");
+					break;
+				case ATEXDXTA:
+					path += _T(".atexdxta");
+					break;
+				case ATTXDXTA:
+					path += _T(".attxdxta");
+					break;
+				default:
+					path += _T(".raw");
+				}
+				previewDlg->SaveRaw(data, dat[i].uncompressedSize, path, dat[i]);
+			}
+
+		}
+	
+		delete[] data;
+}
 	return TRUE;  // return TRUE  unless you set the focus to a control
 }
 
@@ -230,17 +380,17 @@ HCURSOR CGWDatBrowserDlg::OnQueryDragIcon()
 	return static_cast<HCURSOR>(m_hIcon);
 }
 
-void CGWDatBrowserDlg::OnLvnGetdispinfoList1(NMHDR *pNMHDR, LRESULT *pResult)
+void CGWDatBrowserDlg::OnLvnGetdispinfoList1(NMHDR* pNMHDR, LRESULT* pResult)
 {
-	NMLVDISPINFO *pDispInfo = reinterpret_cast<NMLVDISPINFO*>(pNMHDR);
-	LV_ITEM* pItem= &(pDispInfo)->item;
+	NMLVDISPINFO* pDispInfo = reinterpret_cast<NMLVDISPINFO*>(pNMHDR);
+	LV_ITEM* pItem = &(pDispInfo)->item;
 
-	int iItemIndx= sortedIndexToIndex[pItem->iItem];
-	
+	int iItemIndx = sortedIndexToIndex[pItem->iItem];
+
 	if (pItem->mask & LVIF_TEXT) //valid text buffer?
 	{
 		CString text;
-		switch(pItem->iSubItem)
+		switch (pItem->iSubItem)
 		{
 		case 0: //fill in main text
 			text.Format(L"%d", iItemIndx + 1);
@@ -252,7 +402,7 @@ void CGWDatBrowserDlg::OnLvnGetdispinfoList1(NMHDR *pNMHDR, LRESULT *pResult)
 			text.Format(L"%I64d ", dat[iItemIndx].Offset);
 			break;
 		case 3:
-			text.Format(L"%d", dat[iItemIndx].Offset/dat.getSectorSize());
+			text.Format(L"%d", dat[iItemIndx].Offset / dat.getSectorSize());
 			break;
 		case 4:
 			text.Format(L"%d", dat[iItemIndx].Size);
@@ -277,10 +427,10 @@ void CGWDatBrowserDlg::OnLvnGetdispinfoList1(NMHDR *pNMHDR, LRESULT *pResult)
 	*pResult = 0;
 }
 
-void CGWDatBrowserDlg::OnLvnColumnclickList1(NMHDR *pNMHDR, LRESULT *pResult)
+void CGWDatBrowserDlg::OnLvnColumnclickList1(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
-	
+
 	static int lastColumn = 0;
 	static bool ascending = false;
 
@@ -314,28 +464,28 @@ void CGWDatBrowserDlg::OnLvnColumnclickList1(NMHDR *pNMHDR, LRESULT *pResult)
 		fileListCtrl.EnsureVisible(selectedItem, FALSE);
 		fileListCtrl.SetItemState(selectedItem, LVIS_SELECTED, LVIS_SELECTED);
 	}
-	
+
 	fileListCtrl.RedrawItems(0, fileListCtrl.GetItemCount());
 
 	*pResult = 0;
 }
 
-void CGWDatBrowserDlg::OnLvnItemchangedList1(NMHDR *pNMHDR, LRESULT *pResult)
+void CGWDatBrowserDlg::OnLvnItemchangedList1(NMHDR* pNMHDR, LRESULT* pResult)
 {
 	LPNMLISTVIEW pNMLV = reinterpret_cast<LPNMLISTVIEW>(pNMHDR);
 	// TODO: Add your control notification handler code here
 	*pResult = 0;
 
-	if ((pNMLV->uChanged & LVIF_STATE) && (pNMLV->uNewState & LVIS_SELECTED)) 
+	if ((pNMLV->uChanged & LVIF_STATE) && (pNMLV->uNewState & LVIS_SELECTED))
 	{
 		//Selection changed
-		unsigned int index = sortedIndexToIndex[pNMLV->iItem]; 
+		unsigned int index = sortedIndexToIndex[pNMLV->iItem];
 		unsigned char* data = dat.readFile(index);
-		
+
 		if (data)
 		{
 			int type = dat[index].type;
-			if (type >= ATEXDXT1 && type <= ATTXDXTL  && type != ATEXDXTA && type != ATTXDXTA)
+			if (type >= ATEXDXT1 && type <= ATTXDXTL && type != ATEXDXTA && type != ATTXDXTA)
 			{
 				Picture p = ProcessImageFile(data, dat[index].uncompressedSize);
 				delete[] data;
@@ -344,7 +494,7 @@ void CGWDatBrowserDlg::OnLvnItemchangedList1(NMHDR *pNMHDR, LRESULT *pResult)
 					previewDlg->setImage(p, dat[index], index + 1);
 				}
 			}
-			else if(type == SOUND || type == AMP)
+			else if (type == SOUND || type == AMP)
 			{
 				previewDlg->setSoundData(data, dat[index], index + 1);
 			}
@@ -352,10 +502,10 @@ void CGWDatBrowserDlg::OnLvnItemchangedList1(NMHDR *pNMHDR, LRESULT *pResult)
 			{
 				previewDlg->setHexData(data, dat[index], index + 1);
 			}
-			
+
 		}
 		onFileRead(pNMLV->iItem, 0);
-	}	
+	}
 }
 
 void CGWDatBrowserDlg::OnNcDestroy()
@@ -366,7 +516,7 @@ void CGWDatBrowserDlg::OnNcDestroy()
 	delete[] sortedIndexToIndex;
 }
 
-LRESULT CGWDatBrowserDlg::onFileRead( WPARAM wParam, LPARAM lParam )
+LRESULT CGWDatBrowserDlg::onFileRead(WPARAM wParam, LPARAM lParam)
 {
 	progressBarCtrl.SetPos(dat.getFilesRead());
 
@@ -374,7 +524,7 @@ LRESULT CGWDatBrowserDlg::onFileRead( WPARAM wParam, LPARAM lParam )
 		progressBarCtrl.SendMessage(PBM_SETSTATE, PBST_PAUSED, 0);
 
 	CString s;
-	s.Format(L"Files read: %d (%.2f%%) | Textures: %d | Text: %d | Sounds: %d | FFNA: %d | AMAT: %d | MFTBase: %d | Unknown: %d", dat.getFilesRead(), (float)dat.getFilesRead()/dat.getNumFiles()*100.0f, dat.getTextureFiles(), dat.getTextFiles(), dat.getSoundFiles(), dat.getFfnaFiles(), dat.getAmatFiles(), dat.getMftBaseFiles(), dat.getUnknownFiles());
+	s.Format(L"Files read: %d (%.2f%%) | Textures: %d | Text: %d | Sounds: %d | FFNA: %d | AMAT: %d | MFTBase: %d | Unknown: %d", dat.getFilesRead(), (float)dat.getFilesRead() / dat.getNumFiles() * 100.0f, dat.getTextureFiles(), dat.getTextFiles(), dat.getSoundFiles(), dat.getFfnaFiles(), dat.getAmatFiles(), dat.getMftBaseFiles(), dat.getUnknownFiles());
 	filesReadCtrl.SetWindowText(s);
 
 	fileListCtrl.RedrawItems((int)wParam, (int)wParam);
@@ -389,28 +539,28 @@ void CGWDatBrowserDlg::OnContextMenu(CWnd* /*pWnd*/, CPoint point)
 		while (pos)
 		{
 			int nItem = fileListCtrl.GetNextSelectedItem(pos);
-			
-			CMenu contextMenu; 
-			CMenu* tracker = NULL; 
+
+			CMenu contextMenu;
+			CMenu* tracker = NULL;
 
 			//at first we'll load our menu
-			contextMenu.LoadMenu(IDR_CONTEXT); 
+			contextMenu.LoadMenu(IDR_CONTEXT);
 
 			MENUITEMINFO m;
 			m.cbSize = sizeof(m);
 			m.fMask = MIIM_STATE;
 			m.fState = 0;
 
-			tracker = contextMenu.GetSubMenu(2); 
+			tracker = contextMenu.GetSubMenu(2);
 
-			if (dat[nItem].type >= ATEXDXT1 && dat[nItem].type <= ATTXDXTL && dat[nItem].type != ATEXDXTA && dat[nItem].type != ATTXDXTA )
-				tracker->SetMenuItemInfo(ID_FILELIST_EXPORTIMAGE,&m);
+			if (dat[nItem].type >= ATEXDXT1 && dat[nItem].type <= ATTXDXTL && dat[nItem].type != ATEXDXTA && dat[nItem].type != ATTXDXTA)
+				tracker->SetMenuItemInfo(ID_FILELIST_EXPORTIMAGE, &m);
 
 			if (dat[nItem].type != MFTBASE)
-				tracker->SetMenuItemInfo(ID_FILELIST_EXPORTRAWDATA,&m);
-			
+				tracker->SetMenuItemInfo(ID_FILELIST_EXPORTRAWDATA, &m);
+
 			//show the context menu
-			tracker->TrackPopupMenu(TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_RIGHTBUTTON, point.x , point.y , this); 
+			tracker->TrackPopupMenu(TPM_LEFTALIGN | TPM_LEFTBUTTON | TPM_RIGHTBUTTON, point.x, point.y, this);
 		}
 	}
 }

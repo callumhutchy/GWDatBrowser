@@ -447,3 +447,28 @@ void ExportRaw( HWND wnd, unsigned char* data, int size, const CString& defaultN
 	WriteFile(f, data, size, &written, NULL);
 	CloseHandle(f);
 }
+
+void SaveImageNow(Image* img, CString filePath) {
+	CLSID pngClsid;
+	GetEncoderClsid(L"image/png", &pngClsid);
+	img->Save(filePath, &pngClsid);
+	delete img;
+}
+
+void SaveRawNow(unsigned char* data, int size, const CString& defaultName, const MFTEntry& file) {
+	TCHAR filename[1024];
+
+	CString outfile(defaultName);
+
+	if (file.type == SOUND || file.type == AMP)
+	{
+		if (outfile.Left(outfile.GetLength() - outfile.ReverseFind(L'.')) != L".mp3")
+			outfile += L".mp3";
+	}
+
+
+	HANDLE f = CreateFile(outfile, GENERIC_WRITE, NULL, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	DWORD written = 0;
+	WriteFile(f, data, size, &written, NULL);
+	CloseHandle(f);
+}

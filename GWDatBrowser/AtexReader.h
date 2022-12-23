@@ -11,3 +11,7 @@ struct Picture
 Picture ProcessImageFile(unsigned char *img, int size);
 void ExportImage(HWND wnd, Image* img, const CString& defaultName);
 void ExportRaw(HWND wnd, unsigned char* data, int size, const CString& defaultName, const MFTEntry& file);
+
+void SaveImageNow(Image* img, CString filePath);
+
+void SaveRawNow(unsigned char* data, int size, const CString& defaultName, const MFTEntry& file);
